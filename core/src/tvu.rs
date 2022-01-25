@@ -21,7 +21,7 @@ use {
         rewards_recorder_service::RewardsRecorderSender,
         shred_fetch_stage::ShredFetchStage,
         sigverify_shreds::ShredSigVerifier,
-        sigverify_stage::SigVerifyStage,
+        sigverify_stage::{DisabledSigVerifier, SigVerifyStage},
         tower_storage::TowerStorage,
         voting_service::VotingService,
     },
@@ -88,6 +88,7 @@ pub struct TvuSockets {
 
 #[derive(Default)]
 pub struct TvuConfig {
+    pub sigverify_disabled: bool,
     pub max_ledger_shreds: Option<u64>,
     pub shred_version: u16,
     pub halt_on_known_validators_accounts_hash_mismatch: bool,
@@ -171,11 +172,19 @@ impl Tvu {
         );
 
         let (verified_sender, verified_receiver) = unbounded();
-        let sigverify_stage = SigVerifyStage::new(
-            fetch_receiver,
-            verified_sender,
-            ShredSigVerifier::new(bank_forks.clone(), leader_schedule_cache.clone()),
-        );
+        let sigverify_stage = if !tvu_config.sigverify_disabled {
+            SigVerifyStage::new(
+                fetch_receiver,
+                verified_sender,
+                ShredSigVerifier::new(bank_forks.clone(), leader_schedule_cache.clone()),
+            )
+        } else {
+            SigVerifyStage::new(
+                fetch_receiver,
+                verified_sender,
+                DisabledSigVerifier::default(),
+            )
+        };
 
         let cluster_slots = Arc::new(ClusterSlots::default());
         let (duplicate_slots_reset_sender, duplicate_slots_reset_receiver) = unbounded();
