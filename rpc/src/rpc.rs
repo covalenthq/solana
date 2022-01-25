@@ -82,6 +82,9 @@ use {
         TransactionConfirmationStatus, TransactionStatus, UiConfirmedBlock, UiTransactionEncoding,
         VersionedConfirmedBlock,
     },
+    solana_transaction_status::{
+        EncodedTransaction, UiInstruction, UiMessage, UiParsedInstruction,
+    },
     solana_vote_program::vote_state::{VoteState, MAX_LOCKOUT_HISTORY},
     spl_token::{
         solana_program::program_pack::Pack,
@@ -989,6 +992,7 @@ impl JsonRpcRequestProcessor {
             let encoding = config.encoding.unwrap_or(UiTransactionEncoding::Json);
             let transaction_details = config.transaction_details.unwrap_or_default();
             let show_rewards = config.rewards.unwrap_or(true);
+            let show_voting = config.rewards.unwrap_or(true);
             let commitment = config.commitment.unwrap_or_default();
             check_is_at_least_confirmed(commitment)?;
 
@@ -1009,6 +1013,40 @@ impl JsonRpcRequestProcessor {
                         .ok_or(RpcCustomError::UnsupportedTransactionVersion)?;
                     let mut confirmed_block =
                         confirmed_block.configure(encoding, transaction_details, show_rewards);
+                    if !show_voting {
+                        if let Some(mut transactions) = confirmed_block.transactions {
+                            transactions.retain(|transaction| {
+                            match &transaction.transaction {
+                                EncodedTransaction::Json(tx) => {
+                                    match &tx.message {
+                                        UiMessage::Parsed(message) => {
+                                            if !message.instructions.is_empty() {
+                                                match &message.instructions[0] {
+                                                    UiInstruction::Parsed(i) => {
+                                                        match i {
+                                                            UiParsedInstruction::Parsed(instruction) => {
+                                                                instruction.program_id != "Vote111111111111111111111111111111111111111"
+                                                            }
+                                                            UiParsedInstruction::PartiallyDecoded(instruction) => {
+                                                                instruction.program_id != "Vote111111111111111111111111111111111111111"
+                                                            }
+                                                        }
+                                                    }
+                                                    _ => true
+                                                }
+                                            } else {
+                                                true
+                                            }
+                                        },
+                                        _ => true
+                                    }
+                                },
+                                _ => true,
+                            }
+                        });
+                            confirmed_block.transactions = Some(transactions);
+                        }
+                    }
                     if slot == 0 {
                         confirmed_block.block_time = Some(self.genesis_creation_time());
                         confirmed_block.block_height = Some(0);

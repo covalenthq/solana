@@ -246,6 +246,7 @@ pub struct RpcBlockConfig {
     pub encoding: Option<UiTransactionEncoding>,
     pub transaction_details: Option<TransactionDetails>,
     pub rewards: Option<bool>,
+    pub voting: Option<bool>,
     #[serde(flatten)]
     pub commitment: Option<CommitmentConfig>,
 }
