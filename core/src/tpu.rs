@@ -11,7 +11,7 @@ use {
         },
         fetch_stage::FetchStage,
         sigverify::TransactionSigVerifier,
-        sigverify_stage::SigVerifyStage,
+        sigverify_stage::{DisabledSigVerifier, SigVerifyStage},
     },
     crossbeam_channel::{unbounded, Receiver},
     solana_gossip::cluster_info::ClusterInfo,
@@ -59,6 +59,7 @@ impl Tpu {
         entry_receiver: Receiver<WorkingBankEntry>,
         retransmit_slots_receiver: RetransmitSlotsReceiver,
         sockets: TpuSockets,
+        sigverify_disabled: bool,
         subscriptions: &Arc<RpcSubscriptions>,
         transaction_status_sender: Option<TransactionStatusSender>,
         blockstore: &Arc<Blockstore>,
@@ -97,15 +98,25 @@ impl Tpu {
         );
         let (verified_sender, verified_receiver) = unbounded();
 
-        let sigverify_stage = {
+        let sigverify_stage = if !sigverify_disabled {
             let verifier = TransactionSigVerifier::default();
+            SigVerifyStage::new(packet_receiver, verified_sender, verifier)
+        } else {
+            let verifier = DisabledSigVerifier::default();
             SigVerifyStage::new(packet_receiver, verified_sender, verifier)
         };
 
         let (verified_tpu_vote_packets_sender, verified_tpu_vote_packets_receiver) = unbounded();
 
-        let vote_sigverify_stage = {
+        let vote_sigverify_stage = if !sigverify_disabled {
             let verifier = TransactionSigVerifier::new_reject_non_vote();
+            SigVerifyStage::new(
+                vote_packet_receiver,
+                verified_tpu_vote_packets_sender,
+                verifier,
+            )
+        } else {
+            let verifier = DisabledSigVerifier::default();
             SigVerifyStage::new(
                 vote_packet_receiver,
                 verified_tpu_vote_packets_sender,
@@ -118,6 +129,7 @@ impl Tpu {
         let cluster_info_vote_listener = ClusterInfoVoteListener::new(
             exit.clone(),
             cluster_info.clone(),
+            sigverify_disabled,
             verified_gossip_vote_packets_sender,
             poh_recorder.clone(),
             vote_tracker,

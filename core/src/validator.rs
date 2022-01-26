@@ -111,6 +111,7 @@ const MAX_COMPLETED_DATA_SETS_IN_CHANNEL: usize = 100_000;
 const WAIT_FOR_SUPERMAJORITY_THRESHOLD_PERCENT: u64 = 80;
 
 pub struct ValidatorConfig {
+    pub dev_sigverify_disabled: bool,
     pub dev_halt_at_slot: Option<Slot>,
     pub expected_genesis_hash: Option<Hash>,
     pub expected_bank_hash: Option<Hash>,
@@ -170,6 +171,7 @@ pub struct ValidatorConfig {
 impl Default for ValidatorConfig {
     fn default() -> Self {
         Self {
+            dev_sigverify_disabled: false,
             dev_halt_at_slot: None,
             expected_genesis_hash: None,
             expected_bank_hash: None,
@@ -849,6 +851,7 @@ impl Validator {
             bank_notification_sender.clone(),
             cluster_confirmed_slot_receiver,
             TvuConfig {
+                sigverify_disabled: config.dev_sigverify_disabled,
                 max_ledger_shreds: config.max_ledger_shreds,
                 halt_on_known_validators_accounts_hash_mismatch: config
                     .halt_on_known_validators_accounts_hash_mismatch,
@@ -882,6 +885,7 @@ impl Validator {
                 vote: node.sockets.tpu_vote,
                 broadcast: node.sockets.broadcast,
             },
+            config.dev_sigverify_disabled,
             &rpc_subscriptions,
             transaction_status_sender,
             &blockstore,
