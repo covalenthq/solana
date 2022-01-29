@@ -198,6 +198,7 @@ impl ClusterInfoVoteListener {
     pub fn new(
         exit: Arc<AtomicBool>,
         cluster_info: Arc<ClusterInfo>,
+        sigverify_disabled: bool,
         verified_packets_sender: CrossbeamSender<Vec<PacketBatch>>,
         poh_recorder: Arc<Mutex<PohRecorder>>,
         vote_tracker: Arc<VoteTracker>,
@@ -222,6 +223,7 @@ impl ClusterInfoVoteListener {
                     let _ = Self::recv_loop(
                         exit,
                         &cluster_info,
+                        sigverify_disabled,
                         &bank_forks,
                         verified_vote_label_packets_sender,
                         verified_vote_transactions_sender,
@@ -273,6 +275,7 @@ impl ClusterInfoVoteListener {
     fn recv_loop(
         exit: Arc<AtomicBool>,
         cluster_info: &ClusterInfo,
+        sigverify_disabled: bool,
         bank_forks: &RwLock<BankForks>,
         verified_vote_label_packets_sender: VerifiedLabelVotePacketsSender,
         verified_vote_transactions_sender: VerifiedVoteTransactionsSender,
@@ -282,7 +285,7 @@ impl ClusterInfoVoteListener {
             let votes = cluster_info.get_votes(&mut cursor);
             inc_new_counter_debug!("cluster_info_vote_listener-recv_count", votes.len());
             if !votes.is_empty() {
-                let (vote_txs, packets) = Self::verify_votes(votes, bank_forks);
+                let (vote_txs, packets) = Self::verify_votes(votes, bank_forks, sigverify_disabled);
                 verified_vote_transactions_sender.send(vote_txs)?;
                 verified_vote_label_packets_sender.send(packets)?;
             }
@@ -295,11 +298,20 @@ impl ClusterInfoVoteListener {
     fn verify_votes(
         votes: Vec<Transaction>,
         bank_forks: &RwLock<BankForks>,
+        sigverify_disabled: bool
     ) -> (Vec<Transaction>, Vec<VerifiedVoteMetadata>) {
         let mut packet_batches = packet::to_packet_batches(&votes, 1);
 
         // Votes should already be filtered by this point.
-        sigverify::ed25519_verify_cpu(&mut packet_batches, /*reject_non_vote=*/ false);
+        if sigverify_disabled {
+            sigverify::ed25519_verify_disabled(&mut packet_batches)
+        } else {
+            // Votes should already be filtered by this point.
+            sigverify::ed25519_verify_cpu(
+                &mut packet_batches,
+                /*reject_non_vote=*/ false
+            );
+        };
         let root_bank = bank_forks.read().unwrap().root_bank();
         let epoch_schedule = root_bank.epoch_schedule();
         votes
@@ -1497,7 +1509,7 @@ mod tests {
         let bank = Bank::new(&genesis_config);
         let bank_forks = RwLock::new(BankForks::new(bank));
         let votes = vec![];
-        let (vote_txs, packets) = ClusterInfoVoteListener::verify_votes(votes, &bank_forks);
+        let (vote_txs, packets) = ClusterInfoVoteListener::verify_votes(votes, &bank_forks, false);
         assert!(vote_txs.is_empty());
         assert!(packets.is_empty());
     }
@@ -1543,7 +1555,7 @@ mod tests {
         let bank_forks = RwLock::new(BankForks::new(bank));
         let vote_tx = test_vote_tx(voting_keypairs.first(), hash);
         let votes = vec![vote_tx];
-        let (vote_txs, packets) = ClusterInfoVoteListener::verify_votes(votes, &bank_forks);
+        let (vote_txs, packets) = ClusterInfoVoteListener::verify_votes(votes, &bank_forks, false);
         assert_eq!(vote_txs.len(), 1);
         verify_packets_len(&packets, 1);
     }
@@ -1570,7 +1582,7 @@ mod tests {
         let mut bad_vote = vote_tx.clone();
         bad_vote.signatures[0] = Signature::default();
         let votes = vec![vote_tx.clone(), bad_vote, vote_tx];
-        let (vote_txs, packets) = ClusterInfoVoteListener::verify_votes(votes, &bank_forks);
+        let (vote_txs, packets) = ClusterInfoVoteListener::verify_votes(votes, &bank_forks, false);
         assert_eq!(vote_txs.len(), 2);
         verify_packets_len(&packets, 2);
     }

@@ -1167,6 +1167,12 @@ pub fn main() {
                 .help("Launch validator without voting"),
         )
         .arg(
+            Arg::with_name("dev_no_sigverify")
+                .long("dev-no-sigverify")
+                .takes_value(false)
+                .help("Run without signature verification"),
+        )
+        .arg(
             Arg::with_name("no_check_vote_account")
                 .long("no-check-vote-account")
                 .takes_value(false)
@@ -2426,6 +2432,7 @@ pub fn main() {
     };
 
     let mut validator_config = ValidatorConfig {
+        dev_sigverify_disabled: matches.is_present("dev_no_sigverify"),
         require_tower: matches.is_present("require_tower"),
         tower_path: value_t!(matches, "tower", PathBuf).ok(),
         dev_halt_at_slot: value_t!(matches, "dev_halt_at_slot", Slot).ok(),

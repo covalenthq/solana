@@ -6,6 +6,7 @@ use {
 
 pub fn safe_clone_config(config: &ValidatorConfig) -> ValidatorConfig {
     ValidatorConfig {
+        dev_sigverify_disabled: config.dev_sigverify_disabled,
         dev_halt_at_slot: config.dev_halt_at_slot,
         expected_genesis_hash: config.expected_genesis_hash,
         expected_bank_hash: config.expected_bank_hash,
