@@ -11,7 +11,7 @@ use {
         },
         fetch_stage::FetchStage,
         sigverify::TransactionSigVerifier,
-        sigverify_stage::{SigVerifyStage, DisabledSigVerifier},
+        sigverify_stage::{DisabledSigVerifier, SigVerifyStage},
     },
     crossbeam_channel::unbounded,
     solana_gossip::cluster_info::ClusterInfo,

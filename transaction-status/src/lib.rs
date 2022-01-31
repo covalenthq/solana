@@ -33,6 +33,7 @@ use {
         signature::Signature,
         transaction::{Result, Transaction, TransactionError},
     },
+    solana_runtime::bank::is_simple_vote_transaction,
     std::fmt,
 };
 /// A duplicate representation of an Instruction for pretty JSON serialization
@@ -389,11 +390,22 @@ impl ConfirmedBlock {
         encoding: UiTransactionEncoding,
         transaction_details: TransactionDetails,
         show_rewards: bool,
+        show_votes: bool
     ) -> UiConfirmedBlock {
+        let transactions_filtered = if show_votes {
+            self.transactions
+        } else {
+            self.transactions
+                .into_iter()
+                .filter(|tx_with_meta| {
+                    !is_simple_vote_transaction(&tx_with_meta.transaction)
+                })
+                .collect()
+        };
         let (transactions, signatures) = match transaction_details {
             TransactionDetails::Full => (
                 Some(
-                    self.transactions
+                    transactions_filtered
                         .into_iter()
                         .map(|tx| tx.encode(encoding))
                         .collect(),
@@ -403,7 +415,7 @@ impl ConfirmedBlock {
             TransactionDetails::Signatures => (
                 None,
                 Some(
-                    self.transactions
+                    transactions_filtered
                         .into_iter()
                         .map(|tx| tx.transaction.signatures[0].to_string())
                         .collect(),

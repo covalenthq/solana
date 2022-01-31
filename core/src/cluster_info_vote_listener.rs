@@ -298,7 +298,7 @@ impl ClusterInfoVoteListener {
     fn verify_votes(
         votes: Vec<Transaction>,
         bank_forks: &RwLock<BankForks>,
-        sigverify_disabled: bool
+        sigverify_disabled: bool,
     ) -> (Vec<Transaction>, Vec<VerifiedVoteMetadata>) {
         let mut packet_batches = packet::to_packet_batches(&votes, 1);
 
@@ -307,10 +307,7 @@ impl ClusterInfoVoteListener {
             sigverify::ed25519_verify_disabled(&mut packet_batches)
         } else {
             // Votes should already be filtered by this point.
-            sigverify::ed25519_verify_cpu(
-                &mut packet_batches,
-                /*reject_non_vote=*/ false
-            );
+            sigverify::ed25519_verify_cpu(&mut packet_batches, /*reject_non_vote=*/ false);
         };
         let root_bank = bank_forks.read().unwrap().root_bank();
         let epoch_schedule = root_bank.epoch_schedule();

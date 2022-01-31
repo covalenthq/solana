@@ -21,7 +21,7 @@ use {
         rewards_recorder_service::RewardsRecorderSender,
         shred_fetch_stage::ShredFetchStage,
         sigverify_shreds::ShredSigVerifier,
-        sigverify_stage::{SigVerifyStage, DisabledSigVerifier},
+        sigverify_stage::{DisabledSigVerifier, SigVerifyStage},
         snapshot_packager_service::PendingSnapshotPackage,
         voting_service::VotingService,
     },
